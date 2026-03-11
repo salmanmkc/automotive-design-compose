@@ -40,6 +40,10 @@ import kotlinx.coroutines.launch
 // terminology: https://help.figma.com/hc/en-us/articles/8085703771159-Manage-personal-access-tokens
 var ACTION_SET_API_KEY = "setApiKey"
 var EXTRA_SET_API_KEY = "ApiKey"
+var ACTION_ENABLE_LIVE_UPDATE = "enableLiveUpdate"
+var EXTRA_ENABLE_LIVE_UPDATE = "Enabled"
+var ACTION_SET_AUTOPAUSE_TIMEOUT = "setAutopauseTimeout"
+var EXTRA_AUTOPAUSE_TIMEOUT = "TimeoutMs"
 
 class ApiKeyService : Service() {
 
@@ -57,12 +61,26 @@ class ApiKeyService : Service() {
         if (intent.action == "setFigmaKey") {
             setApiKey(intent.getStringExtra("ApiKey"))
         }
+        if (intent.action == ACTION_ENABLE_LIVE_UPDATE) {
+            setLiveUpdateEnabled(intent.getBooleanExtra(EXTRA_ENABLE_LIVE_UPDATE, true))
+        }
+        if (intent.action == ACTION_SET_AUTOPAUSE_TIMEOUT) {
+            val timeout = intent.getLongExtra(EXTRA_AUTOPAUSE_TIMEOUT, -1)
+            if (timeout != -1L) setAutopauseTimeout(timeout)
+        }
         return binder
     }
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
         if (intent.action == ACTION_SET_API_KEY) {
             intent.getStringExtra(EXTRA_SET_API_KEY)?.let { key -> setApiKey(key) }
+        }
+        if (intent.action == ACTION_ENABLE_LIVE_UPDATE) {
+            setLiveUpdateEnabled(intent.getBooleanExtra(EXTRA_ENABLE_LIVE_UPDATE, true))
+        }
+        if (intent.action == ACTION_SET_AUTOPAUSE_TIMEOUT) {
+            val timeout = intent.getLongExtra(EXTRA_AUTOPAUSE_TIMEOUT, -1)
+            if (timeout != -1L) setAutopauseTimeout(timeout)
         }
         stopSelf()
         return START_NOT_STICKY
@@ -73,6 +91,18 @@ class ApiKeyService : Service() {
             CoroutineScope(dispatcher).launch {
                 DesignSettings.liveUpdateSettings?.setFigmaApiKey(key)
             }
+        }
+    }
+
+    fun setLiveUpdateEnabled(enabled: Boolean) {
+        CoroutineScope(dispatcher).launch {
+            DesignSettings.liveUpdateSettings?.setLiveUpdateEnabled(enabled)
+        }
+    }
+
+    fun setAutopauseTimeout(timeoutMs: Long) {
+        CoroutineScope(dispatcher).launch {
+            DesignSettings.liveUpdateSettings?.setLiveUpdateTimeout(timeoutMs)
         }
     }
 }

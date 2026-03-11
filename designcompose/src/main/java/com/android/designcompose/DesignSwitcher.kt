@@ -24,6 +24,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,7 +40,10 @@ import com.android.designcompose.common.FeedbackLevel
 import com.android.designcompose.common.NodeQuery
 import java.time.Instant
 import kotlin.collections.HashMap
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private interface DesignSwitcher {
     private fun queries(): ArrayList<String> {
@@ -54,6 +58,7 @@ private interface DesignSwitcher {
             "#MiniMessagesCheckbox",
             "#ShowRecompositionCheckbox",
             "#UseLocalResCheckbox",
+            "#LiveUpdateCheckbox",
             "#DesignViewMain",
             "#LiveMode",
             "#TopStatusBar",
@@ -80,6 +85,7 @@ private interface DesignSwitcher {
             "#MiniMessagesCheckbox",
             "#ShowRecompositionCheckbox",
             "#UseLocalResCheckbox",
+            "#LiveUpdateCheckbox",
             "#Name",
             "#Id",
             "#Text",
@@ -166,6 +172,7 @@ private interface DesignSwitcher {
         mini_messages_checkbox: ReplacementContent,
         show_recomposition_checkbox: ReplacementContent,
         useLocalResCheckbox: ReplacementContent,
+        live_update_checkbox: ReplacementContent,
         live_mode: LiveMode,
         top_status_bar: TopStatusBar,
     ) {
@@ -186,6 +193,7 @@ private interface DesignSwitcher {
         customizations.setContent("#MiniMessagesCheckbox", mini_messages_checkbox)
         customizations.setContent("#ShowRecompositionCheckbox", show_recomposition_checkbox)
         customizations.setContent("#UseLocalResCheckbox", useLocalResCheckbox)
+        customizations.setContent("#LiveUpdateCheckbox", live_update_checkbox)
 
         val variantProperties = HashMap<String, String>()
         variantProperties["#LiveMode"] = live_mode.name
@@ -518,6 +526,26 @@ private fun GetUseLocalResCheckbox(
 }
 
 @Composable
+private fun GetLiveUpdateCheckbox(state: Boolean, setState: (Boolean) -> Unit): ReplacementContent {
+    val clickModifier =
+        Modifier.clickable {
+            setState(!state)
+            DesignSettings.liveUpdateSettings?.let {
+                CoroutineScope(Dispatchers.Main).launch { it.setLiveUpdateEnabled(!state) }
+            }
+        }
+    return ReplacementContent(
+        count = 1,
+        content = {
+            {
+                if (state) DesignSwitcherDoc.Checkbox(modifier = clickModifier, true)
+                else DesignSwitcherDoc.Checkbox(modifier = clickModifier, false)
+            }
+        },
+    )
+}
+
+@Composable
 internal fun DesignSwitcher(
     doc: DocContent?,
     currentDocId: DesignDocId,
@@ -558,6 +586,7 @@ internal fun DesignSwitcher(
     val (showRecompositionChecked, setShowRecompositionChecked) =
         remember { mutableStateOf(DebugNodeManager.getShowRecomposition().value ?: false) }
     val (useLocalResChecked, setUseLocalResChecked) = remember { DebugNodeManager.getUseLocalRes() }
+    val liveUpdateEnabled by DesignSettings.liveUpdateEnabled
     val miniMessage = if (miniMessagesChecked) getMiniMessage() else ""
 
     CompositionLocalProvider(LocalDocOverrideContext provides designSwitcherDocId()) {
@@ -603,6 +632,7 @@ internal fun DesignSwitcher(
             show_recomposition_checkbox =
                 GetShowRecompositionCheckbox(showRecompositionChecked, setShowRecompositionChecked),
             useLocalResCheckbox = GetUseLocalResCheckbox(useLocalResChecked, setUseLocalResChecked),
+            live_update_checkbox = GetLiveUpdateCheckbox(liveUpdateEnabled) {},
             live_mode =
                 if (DesignSettings.isDocumentLive.value) DesignSwitcher.LiveMode.Live
                 else DesignSwitcher.LiveMode.Offline,
